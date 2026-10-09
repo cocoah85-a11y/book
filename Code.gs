@@ -41,7 +41,60 @@ function doGet(e) {
       return handleCheckConnection(params);
     }
 
-    // 1-4. 브라우저에서 주소를 직접 열었을 때: 친절한 연결 점검 및 웹앱 이동 안내 페이지
+    // 1-4. GET 예약 생성 지원 (?action=createReservation) - CORS/리다이렉트 완전 호환
+    if (action === "createreservation") {
+      var ss = getSpreadsheetSafe(params);
+      if (!ss) {
+        return jsonResponse({
+          success: false,
+          message: "스프레드시트를 찾을 수 없습니다. SPREADSHEET_ID를 확인해주세요."
+        });
+      }
+      var resSheet = getReservationSheetSafe(ss);
+      if (!resSheet) {
+        return jsonResponse({
+          success: false,
+          message: "예약내역(Reservations) 시트를 생성하거나 접근할 수 없습니다."
+        });
+      }
+      var reservationData = {
+        seatId: params.seatId,
+        userName: params.userName,
+        userPhone: params.userPhone,
+        date: params.date,
+        startTime: params.startTime,
+        endTime: params.endTime
+      };
+      if (params.data) {
+        try {
+          var parsed = JSON.parse(params.data);
+          reservationData = Object.assign(reservationData, parsed);
+        } catch (e) {}
+      }
+      return handleCreateReservation(resSheet, reservationData);
+    }
+
+    // 1-5. GET 예약 취소 지원 (?action=cancelReservation&reservationId=...)
+    if (action === "cancelreservation") {
+      var ssCancel = getSpreadsheetSafe(params);
+      if (!ssCancel) {
+        return jsonResponse({
+          success: false,
+          message: "스프레드시트를 찾을 수 없습니다."
+        });
+      }
+      var resSheetCancel = getReservationSheetSafe(ssCancel);
+      if (!resSheetCancel) {
+        return jsonResponse({
+          success: false,
+          message: "예약내역(Reservations) 시트에 접근할 수 없습니다."
+        });
+      }
+      var rId = params.reservationId || params.id;
+      return handleCancelReservation(resSheetCancel, rId);
+    }
+
+    // 1-6. 브라우저에서 주소를 직접 열었을 때: 친절한 연결 점검 및 웹앱 이동 안내 페이지
     return handleBrowserView();
   } catch (globalErr) {
     return jsonResponse({

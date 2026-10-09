@@ -1,7 +1,8 @@
 import { ApiResponse, CreateReservationPayload, Reservation, Seat } from '../types';
 import { DEFAULT_SEATS } from '../data/defaultSeats';
 
-export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxty6hr1P8vQRKV_UcVmbpef_aGFHO-OYCO8ayc-saHvmgwkIxpMXWEXDn79ZQgLjyvDg/exec';
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwa-1PRptn7V7Cfcb6l-cfBaGZvLl-NlqkHRXfopHfXK760-juIV8Q_hWGKxLRLH-u5Tw/exec';
+const OLD_GAS_URL = 'https://script.google.com/macros/s/AKfycbxty6hr1P8vQRKV_UcVmbpef_aGFHO-OYCO8ayc-saHvmgwkIxpMXWEXDn79ZQgLjyvDg/exec';
 
 const STORAGE_KEY_RESERVATIONS = 'lib_reservations_v1';
 const STORAGE_KEY_GAS_URL = 'lib_gas_api_url';
@@ -9,7 +10,12 @@ const STORAGE_KEY_SEATS = 'lib_custom_seats_v1';
 
 export function getStoredApiUrl(): string {
   try {
-    return localStorage.getItem(STORAGE_KEY_GAS_URL) || DEFAULT_GAS_URL;
+    const stored = localStorage.getItem(STORAGE_KEY_GAS_URL);
+    if (!stored || stored === OLD_GAS_URL) {
+      localStorage.setItem(STORAGE_KEY_GAS_URL, DEFAULT_GAS_URL);
+      return DEFAULT_GAS_URL;
+    }
+    return stored;
   } catch {
     return DEFAULT_GAS_URL;
   }
@@ -334,23 +340,51 @@ class GasClient {
     saveLocalReservations(local);
 
     try {
-      // For GAS Web Apps, text/plain prevents CORS preflight OPTIONS failure
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify(payload),
-        mode: 'cors'
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      let json: ApiResponse | null = null;
+      // First try standard POST
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload),
+          mode: 'cors'
+        });
+        if (res.ok) {
+          json = await res.json() as ApiResponse;
+        }
+      } catch (postErr) {
+        console.warn('POST failed, attempting GET fallback for GAS:', postErr);
       }
 
-      const json = await res.json() as ApiResponse;
+      // If POST didn't succeed, try GET fallback
+      if (!json || !json.success) {
+        try {
+          const getParams = new URLSearchParams({
+            action: 'createReservation',
+            seatId: data.seatId,
+            userName: data.userName,
+            userPhone: cleanPhone,
+            date: data.date,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            t: String(Date.now())
+          });
+          const getRes = await fetch(`${apiUrl}?${getParams.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            mode: 'cors'
+          });
+          if (getRes.ok) {
+            json = await getRes.json() as ApiResponse;
+          }
+        } catch (getErr) {
+          console.warn('GET fallback failed as well:', getErr);
+        }
+      }
 
-      if (json.success) {
+      if (json && json.success) {
         const assignedId = json.reservationId || json.data?.toString() || fallbackId;
         newReservation.id = assignedId;
         // update local id if remote gave another
@@ -372,7 +406,7 @@ class GasClient {
         reservationId: fallbackId,
         reservation: newReservation,
         isFallback: true,
-        message: json.message ? `GAS 응답 알림: ${json.message} (로컬 예약 완료)` : '예약이 완료되었습니다 (로컬 세션 저장).'
+        message: (json && json.message) ? `GAS 응답 알림: ${json.message} (로컬 예약 완료)` : '예약이 완료되었습니다 (로컬 세션 저장).'
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -408,22 +442,39 @@ class GasClient {
     };
 
     try {
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify(payload),
-        mode: 'cors'
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      let json: ApiResponse | null = null;
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload),
+          mode: 'cors'
+        });
+        if (res.ok) {
+          json = await res.json() as ApiResponse;
+        }
+      } catch (postErr) {
+        console.warn('cancelReservation POST failed, trying GET fallback:', postErr);
       }
 
-      const json = await res.json() as ApiResponse;
+      if (!json || !json.success) {
+        try {
+          const getRes = await fetch(`${apiUrl}?action=cancelReservation&reservationId=${encodeURIComponent(reservationId)}&t=${Date.now()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            mode: 'cors'
+          });
+          if (getRes.ok) {
+            json = await getRes.json() as ApiResponse;
+          }
+        } catch (getErr) {
+          console.warn('cancelReservation GET fallback error:', getErr);
+        }
+      }
 
-      if (json.success) {
+      if (json && json.success) {
         return {
           success: true,
           message: json.message || '예약이 정상적으로 취소되었습니다.',
@@ -433,7 +484,7 @@ class GasClient {
 
       return {
         success: true,
-        message: json.message || '예약이 취소되었습니다 (로컬 반영).',
+        message: (json && json.message) || '예약이 취소되었습니다 (로컬 반영).',
         isFallback: true
       };
     } catch (err: unknown) {

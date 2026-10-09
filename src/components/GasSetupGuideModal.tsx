@@ -92,6 +92,20 @@ function doGet(e) {
     if (action === "check" || action === "test") {
       return handleCheckConnection(params);
     }
+    if (action === "createreservation") {
+      var ssCreate = getSpreadsheetSafe(params);
+      if (!ssCreate) return jsonResponse({ success: false, message: "스프레드시트를 찾을 수 없습니다." });
+      var resSheetCreate = getReservationSheetSafe(ssCreate);
+      var resData = { seatId: params.seatId, userName: params.userName, userPhone: params.userPhone, date: params.date, startTime: params.startTime, endTime: params.endTime };
+      if (params.data) { try { Object.assign(resData, JSON.parse(params.data)); } catch(e){} }
+      return handleCreateReservation(resSheetCreate, resData);
+    }
+    if (action === "cancelreservation") {
+      var ssCancel = getSpreadsheetSafe(params);
+      if (!ssCancel) return jsonResponse({ success: false, message: "스프레드시트를 찾을 수 없습니다." });
+      var resSheetCancel = getReservationSheetSafe(ssCancel);
+      return handleCancelReservation(resSheetCancel, params.reservationId || params.id);
+    }
     return handleBrowserView();
   } catch (err) {
     return jsonResponse({ success: false, message: "doGet 오류: " + err.toString() });
