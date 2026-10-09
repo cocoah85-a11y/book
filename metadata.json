@@ -1,0 +1,6 @@
+{
+  "name": "스마트 도서관 좌석/공간 예약 시스템",
+  "description": "Google Apps Script(GAS) 연동 모바일 친화형 도서관 열람실 좌석 및 스터디룸 실시간 예약 웹앱",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

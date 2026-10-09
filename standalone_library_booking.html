@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>스마트 도서관 좌석/공간 예약 시스템</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Plus Jakarta Sans & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', '"Noto Sans KR"', 'sans-serif'],
+          },
+          colors: {
+            library: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              800: '#1e293b',
+              900: '#0f172a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans KR', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 4px;
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-24 md:pb-12">
+
+  <!-- TOP HEADER -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-slate-900 text-emerald-400 flex items-center justify-center font-bold text-lg shadow-sm">
+          <span>📚</span>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 leading-tight">늘푸른 도서관</h1>
+          <p class="text-xs text-slate-500 font-medium">좌석 및 스터디룸 예약 시스템</p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center gap-2">
+        <button id="btn-open-my-bookings" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span>내 예약 조회</span>
+        </button>
+        <button id="btn-gas-info" class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors" title="GAS 연동 상태">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- GAS STATUS ALERT BANNER (IF APPLICABLE) -->
+  <div id="gas-alert-banner" class="hidden bg-emerald-50 border-b border-emerald-200 px-4 py-2.5 text-xs text-emerald-800">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span id="gas-alert-text">Google Apps Script Web App 연동 활성화됨</span>
+      </div>
+      <button id="btn-close-banner" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- DATE & FILTER CONTROLS -->
+    <section class="bg-white rounded-2xl p-4 md:p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        <div>
+          <span class="text-xs font-semibold text-emerald-700 tracking-wide uppercase">Step 1</span>
+          <h2 class="text-base font-bold text-slate-900">예약 일자 및 구역 선택</h2>
+        </div>
+        <!-- Operational Info -->
+        <div class="text-xs text-slate-500 flex items-center gap-2">
+          <span>운영 시간: 09:00 ~ 22:00</span>
+          <span>·</span>
+          <span>당일~7일 후까지 예약 가능</span>
+        </div>
+      </div>
+
+      <!-- Date selector row -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl" id="date-shortcuts">
+          <button type="button" data-offset="0" class="date-chip px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-white text-slate-900 shadow-sm">오늘</button>
+          <button type="button" data-offset="1" class="date-chip px-3 py-1.5 text-xs font-medium rounded-lg transition-colors text-slate-600 hover:text-slate-900">내일</button>
+          <button type="button" data-offset="2" class="date-chip px-3 py-1.5 text-xs font-medium rounded-lg transition-colors text-slate-600 hover:text-slate-900">모레</button>
+        </div>
+
+        <div class="flex items-center gap-2 ml-auto w-full sm:w-auto">
+          <label for="reservation-date" class="text-xs text-slate-500 font-medium whitespace-nowrap">달력 선택:</label>
+          <input type="date" id="reservation-date" class="w-full sm:w-auto px-3 py-1.5 text-xs font-medium text-slate-800 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+      </div>
+
+      <!-- Type Filter Buttons -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar" id="type-filter-group">
+        <button type="button" data-type="all" class="type-filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white whitespace-nowrap">
+          전체 보기 (<span id="count-all">0</span>)
+        </button>
+        <button type="button" data-type="general" class="type-filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 whitespace-nowrap">
+          📖 일반 열람석 (<span id="count-general">0</span>)
+        </button>
+        <button type="button" data-type="laptop" class="type-filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 whitespace-nowrap">
+          💻 노트북존 (<span id="count-laptop">0</span>)
+        </button>
+        <button type="button" data-type="study_room" class="type-filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 whitespace-nowrap">
+          👥 스터디룸 (<span id="count-study_room">0</span>)
+        </button>
+      </div>
+    </section>
+
+    <!-- VIEW TABS (Grid vs Floor Plan) -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <button id="tab-grid" class="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-white border border-slate-300 text-slate-900 shadow-sm flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          <span>좌석 목록 (카드)</span>
+        </button>
+        <button id="tab-map" class="px-3.5 py-1.5 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/60 flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+          <span>도서관 평면도 (2D)</span>
+        </button>
+      </div>
+
+      <div class="text-xs text-slate-500 hidden sm:block">
+        <span class="inline-block w-2.5 h-2.5 rounded bg-emerald-500 mr-1"></span>예약가능
+        <span class="inline-block w-2.5 h-2.5 rounded bg-slate-300 ml-2 mr-1"></span>예약불가/사용중
+      </div>
+    </div>
+
+    <!-- SEATS GRID VIEW -->
+    <div id="view-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Injected via JavaScript -->
+    </div>
+
+    <!-- FLOOR MAP VIEW -->
+    <div id="view-map" class="hidden bg-white rounded-2xl p-4 md:p-6 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between text-xs text-slate-500">
+        <p>💡 평면도 상의 좌석을 터치하시면 즉시 예약 폼이 열립니다.</p>
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500"></span> 예약 가능</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-400"></span> 일부 시간 예약됨</span>
+        </div>
+      </div>
+
+      <!-- Floor Plan Canvas Container -->
+      <div class="relative w-full aspect-[16/10] bg-slate-50 border-2 border-slate-200 rounded-xl overflow-hidden shadow-inner p-3">
+        <!-- Architectural Landmarks -->
+        <div class="absolute top-2 left-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Library 2F Architectural Plan</div>
+        
+        <!-- Entrance & Desk -->
+        <div class="absolute bottom-2 left-4 px-3 py-1.5 bg-slate-200 border border-slate-300 rounded text-center text-[10px] font-bold text-slate-600">
+          🚪 출입구 / 자동 게이트
+        </div>
+        <div class="absolute bottom-2 left-36 px-3 py-1.5 bg-slate-200 border border-slate-300 rounded text-center text-[10px] font-bold text-slate-600">
+          ℹ️ 도서관 안내 & 대출 데스크
+        </div>
+        <div class="absolute top-2 right-4 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded text-center text-[10px] font-bold text-amber-700">
+          ☕ 북카페 & 휴게 테라스
+        </div>
+
+        <!-- Zones background indicators -->
+        <div class="absolute top-12 left-6 w-[45%] h-[50%] border border-dashed border-slate-300 rounded-lg p-2 pointer-events-none">
+          <span class="text-[10px] font-semibold text-slate-400">제1열람실 (집중정숙)</span>
+        </div>
+        <div class="absolute top-12 right-6 w-[35%] h-[50%] border border-dashed border-blue-200 bg-blue-50/20 rounded-lg p-2 pointer-events-none">
+          <span class="text-[10px] font-semibold text-blue-500">노트북 존 (타이핑 가능)</span>
+        </div>
+        <div class="absolute bottom-16 left-6 right-6 h-[22%] border border-dashed border-emerald-200 bg-emerald-50/20 rounded-lg p-2 pointer-events-none">
+          <span class="text-[10px] font-semibold text-emerald-600">그룹 스터디룸 구역 (방음실)</span>
+        </div>
+
+        <!-- Seats on Map -->
+        <div id="map-seats-container" class="absolute inset-0 pointer-events-auto">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- BOOKING MODAL (BOTTOM SHEET ON MOBILE, CENTERED ON DESKTOP) -->
+  <div id="booking-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in fade-in">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <span id="modal-seat-badge" class="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">일반 열람석</span>
+          <h3 id="modal-seat-title" class="text-lg font-bold">좌석 S01 예약하기</h3>
+        </div>
+        <button id="btn-close-booking-modal" class="text-slate-400 hover:text-white p-1 rounded-lg">&times;</button>
+      </div>
+
+      <!-- Modal Body -->
+      <form id="booking-form" class="p-6 space-y-4">
+        <!-- Selected Seat Specs -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+          <div class="flex items-center justify-between text-xs text-slate-700">
+            <span class="font-medium text-slate-500">위치/구역:</span>
+            <span id="modal-seat-zone" class="font-bold">제1열람실</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-700">
+            <span class="font-medium text-slate-500">구비 시설:</span>
+            <span id="modal-seat-features" class="font-semibold text-slate-800">개별 스탠드, 220V 콘센트</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-700">
+            <span class="font-medium text-slate-500">예약 일자:</span>
+            <span id="modal-reservation-date" class="font-bold text-emerald-700">2026-10-10</span>
+          </div>
+        </div>
+
+        <!-- Name Input -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">예약자 성함 <span class="text-red-500">*</span></label>
+          <input type="text" id="input-user-name" required placeholder="예: 홍길동" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <!-- Phone Input -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">연락처 (휴대폰) <span class="text-red-500">*</span></label>
+          <input type="tel" id="input-user-phone" required placeholder="010-0000-0000" maxlength="13" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <p class="text-[11px] text-slate-400 mt-1">예약 조회 및 입장 확인에 사용됩니다.</p>
+        </div>
+
+        <!-- Time Range Picker -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">이용 시작 시간</label>
+            <select id="select-start-time" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+              <!-- Options filled by JS -->
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">이용 종료 시간</label>
+            <select id="select-end-time" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+              <!-- Options filled by JS -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Real-time conflict feedback -->
+        <div id="time-conflict-warning" class="hidden p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2">
+          <span>⚠️</span>
+          <span id="time-conflict-text">선택하신 시간대에 이미 다른 예약이 존재합니다.</span>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="pt-2">
+          <button type="submit" id="btn-submit-booking" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
+            <span id="btn-submit-text">예약 완료하기</span>
+            <div id="btn-submit-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- BOOKING SUCCESS MODAL -->
+  <div id="success-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl border border-slate-200 space-y-4">
+      <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+        ✓
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-slate-900">도서관 좌석 예약 완료!</h3>
+        <p class="text-xs text-slate-500 mt-1">예약이 정상적으로 접수되었습니다.</p>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left space-y-2 text-xs">
+        <div class="flex justify-between">
+          <span class="text-slate-500">예약 번호:</span>
+          <span id="success-res-id" class="font-mono font-bold text-slate-900">RES_...</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">좌석 번호:</span>
+          <span id="success-seat-name" class="font-bold text-slate-900">S01</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">이용 일시:</span>
+          <span id="success-time" class="font-bold text-emerald-700">2026-10-10 (09:00~12:00)</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">예약자:</span>
+          <span id="success-user-name" class="font-medium text-slate-800">홍길동</span>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button id="btn-copy-res-id" class="flex-1 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition-colors">
+          예약번호 복사
+        </button>
+        <button id="btn-close-success" class="flex-1 py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition-colors">
+          확인
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MY BOOKINGS MODAL -->
+  <div id="my-bookings-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 class="text-base font-bold">내 예약 조회 / 취소</h3>
+        <button id="btn-close-my-bookings" class="text-slate-400 hover:text-white p-1">&times;</button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto">
+        <!-- Search input -->
+        <div class="flex gap-2">
+          <input type="text" id="input-search-query" placeholder="휴대폰 번호 또는 예약 번호 입력" class="flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <button id="btn-search-bookings" class="px-4 py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-colors">
+            조회
+          </button>
+        </div>
+
+        <!-- Bookings list container -->
+        <div id="my-bookings-list" class="space-y-3 min-h-[140px]">
+          <p class="text-xs text-slate-400 text-center py-8">휴대폰 번호(010-0000-0000)를 입력하여 예약을 조회하세요.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAS BACKEND INFO MODAL -->
+  <div id="gas-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900">Google Apps Script (GAS) 연동 상태</h3>
+        <button id="btn-close-gas-modal" class="text-slate-400 hover:text-slate-600">&times;</button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-600">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">현재 Web App API URL:</label>
+          <input type="text" id="input-gas-api-url" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono text-[11px]" value="https://script.google.com/macros/s/AKfycbxty6hr1P8vQRKV_UcVmbpef_aGFHO-OYCO8ayc-saHvmgwkIxpMXWEXDn79ZQgLjyvDg/exec">
+        </div>
+        <p class="text-[11px] text-slate-500">
+          ※ 브라우저 CORS 보안 정책 및 Google 스프레드시트 초기화 상태에 따라 자동 로컬 세션 백업 모드가 동작합니다. 새 예약을 등록하면 로컬과 GAS 서버 모두에 전송됩니다.
+        </p>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="btn-save-gas-url" class="px-4 py-2 bg-emerald-600 text-white font-semibold text-xs rounded-xl hover:bg-emerald-700 transition-colors">
+          URL 저장 및 재연결
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // --- STATE & CONFIG ---
+    let API_URL = 'https://script.google.com/macros/s/AKfycbxty6hr1P8vQRKV_UcVmbpef_aGFHO-OYCO8ayc-saHvmgwkIxpMXWEXDn79ZQgLjyvDg/exec';
+    
+    // Default Seat Database (Matches Google Sheet Schema: SeatId, Name, Type, Status)
+    const DEFAULT_SEATS = [
+      { id: 'S01', name: '1번 일반 열람석', type: 'Desk', status: 'Available', zone: '제1열람실 (집중정숙)', capacity: 1, features: ['개별 LED 스탠드', '220V 콘센트 1구', '독서대 비치', '프라이빗 칸막이'], x: 28, y: 35 },
+      { id: 'S02', name: '2번 노트북 열람석', type: 'Laptop', status: 'Available', zone: '노트북 존 (타이핑 가능)', capacity: 1, features: ['Wi-Fi 6', '듀얼 콘센트', '무소음 마우스패드'], x: 65, y: 35 },
+      { id: 'R01', name: '1번 스터디룸 (4인)', type: 'Room', status: 'Available', zone: '그룹 미팅룸 구역', capacity: 4, features: ['방음벽 시공', '55인치 4K TV', '자석 화이트보드'], x: 46, y: 75 }
+    ];
+
+    const TIME_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'];
+
+    let state = {
+      seats: [...DEFAULT_SEATS],
+      selectedDate: getFormattedDate(0),
+      selectedType: 'all',
+      reservations: [],
+      selectedSeat: null,
+      activeView: 'grid' // 'grid' | 'map'
+    };
+
+    // Helper date
+    function getFormattedDate(offsetDays = 0) {
+      const d = new Date();
+      d.setDate(d.getDate() + offsetDays);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    // --- TOAST NOTIFICATIONS ---
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const bgColor = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-red-600' : 'bg-slate-800';
+      toast.className = `${bgColor} text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 transform transition-all duration-300 pointer-events-auto`;
+      toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '⚠️' : 'ℹ️'}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // --- LOCAL STORAGE FOR BACKUP RESERVATIONS ---
+    function getStoredReservations() {
+      try {
+        const raw = localStorage.getItem('lib_res_standalone');
+        return raw ? JSON.parse(raw) : [
+          { id: 'RES_20261009_S01_7124', seatId: 'S01', userName: '김민준', userPhone: '010-3456-7890', date: getFormattedDate(0), startTime: '10:00', endTime: '13:00', status: 'CONFIRMED' },
+          { id: 'RES_20261009_L03_4491', seatId: 'L03', userName: '이지원', userPhone: '010-8765-4321', date: getFormattedDate(0), startTime: '14:00', endTime: '18:00', status: 'CONFIRMED' }
+        ];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveStoredReservations(list) {
+      try {
+        localStorage.setItem('lib_res_standalone', JSON.stringify(list));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // --- API CLIENT ---
+    async function fetchReservations(date) {
+      try {
+        const res = await fetch(`${API_URL}?action=getReservations&date=${date}&t=${Date.now()}`);
+        if (!res.ok) throw new Error('API Response Error');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data || json.reservations)) {
+          const remote = json.data || json.reservations;
+          state.reservations = remote;
+          return;
+        }
+      } catch (err) {
+        console.warn('GAS API fallback mode activated:', err);
+      }
+      // Fallback local
+      const local = getStoredReservations().filter(r => r.date === date && r.status !== 'CANCELLED');
+      state.reservations = local;
+    }
+
+    // --- UI RENDER FUNCTIONS ---
+    function updateCounts() {
+      document.getElementById('count-all').innerText = state.seats.length;
+      document.getElementById('count-general').innerText = state.seats.filter(s => s.type === 'general').length;
+      document.getElementById('count-laptop').innerText = state.seats.filter(s => s.type === 'laptop').length;
+      document.getElementById('count-study_room').innerText = state.seats.filter(s => s.type === 'study_room').length;
+    }
+
+    function isSeatReserved(seatId) {
+      return state.reservations.some(r => r.seatId === seatId && r.status !== 'CANCELLED');
+    }
+
+    function getSeatBookings(seatId) {
+      return state.reservations.filter(r => r.seatId === seatId && r.status !== 'CANCELLED');
+    }
+
+    function renderGridView() {
+      const grid = document.getElementById('view-grid');
+      grid.innerHTML = '';
+
+      const filtered = state.seats.filter(s => {
+        if (state.selectedType === 'all') return true;
+        const t = String(s.type || '').toLowerCase();
+        if (state.selectedType === 'general') return t === 'desk' || t === 'general';
+        if (state.selectedType === 'laptop') return t === 'laptop';
+        if (state.selectedType === 'study_room') return t === 'room' || t === 'study_room';
+        return true;
+      });
+
+      filtered.forEach(seat => {
+        const bookings = getSeatBookings(seat.id);
+        const hasBookings = bookings.length > 0;
+        
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between";
+
+        const t = String(seat.type || '').toLowerCase();
+        const typeBadge = (t === 'desk' || t === 'general') ? '일반석 (Desk)' : (t === 'laptop') ? '노트북석 (Laptop)' : '스터디룸 (Room)';
+        const typeColor = (t === 'desk' || t === 'general') ? 'bg-slate-100 text-slate-700' : (t === 'laptop') ? 'bg-sky-50 text-sky-800' : 'bg-emerald-50 text-emerald-800';
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md ${typeColor}">${typeBadge} · 정원 ${seat.capacity}명</span>
+              <span class="text-xs font-semibold ${hasBookings ? 'text-amber-600' : 'text-emerald-600'}">
+                ${hasBookings ? '일부 시간 예약됨' : '예약 가능'}
+              </span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900 mb-1">${seat.name}</h3>
+            <p class="text-xs text-slate-500 mb-3">${seat.zone}</p>
+            
+            <!-- Features chips -->
+            <div class="flex flex-wrap gap-1 mb-4">
+              ${seat.features.map(f => `<span class="text-[10px] bg-slate-50 border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded">${f}</span>`).join('')}
+            </div>
+
+            <!-- Mini timeline indicator (09:00 to 22:00) -->
+            <div class="mb-4">
+              <div class="text-[10px] text-slate-400 mb-1 flex justify-between">
+                <span>09:00</span>
+                <span>이용 현황 타임라인</span>
+                <span>22:00</span>
+              </div>
+              <div class="h-2 bg-slate-100 rounded-full flex overflow-hidden">
+                ${TIME_SLOTS.slice(0, -1).map(slot => {
+                  const isBlocked = bookings.some(b => b.startTime <= slot && slot < b.endTime);
+                  return `<div class="flex-1 ${isBlocked ? 'bg-red-400' : 'bg-emerald-400'} border-r border-white/40" title="${slot}: ${isBlocked ? '예약됨' : '비어있음'}"></div>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-book-seat w-full py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white transition-colors" data-seat-id="${seat.id}">
+            좌석 예약하기
+          </button>
+        `;
+        grid.appendChild(card);
+      });
+
+      // Bind button events
+      document.querySelectorAll('.btn-book-seat').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const seatId = e.currentTarget.getAttribute('data-seat-id');
+          openBookingModal(seatId);
+        });
+      });
+    }
+
+    function renderFloorMap() {
+      const container = document.getElementById('map-seats-container');
+      container.innerHTML = '';
+
+      state.seats.forEach(seat => {
+        const bookings = getSeatBookings(seat.id);
+        const hasBookings = bookings.length > 0;
+        const marker = document.createElement('button');
+        marker.type = 'button';
+        marker.className = `absolute transform -translate-x-1/2 -translate-y-1/2 p-1.5 rounded-lg text-[10px] font-bold shadow-md transition-transform hover:scale-110 flex flex-col items-center justify-center ${hasBookings ? 'bg-slate-700 text-white' : 'bg-emerald-600 text-white'}`;
+        marker.style.left = `${seat.x}%`;
+        marker.style.top = `${seat.y}%`;
+        marker.title = `${seat.name} (${seat.zone})`;
+
+        marker.innerHTML = `
+          <span>${seat.id}</span>
+        `;
+
+        marker.addEventListener('click', () => openBookingModal(seat.id));
+        container.appendChild(marker);
+      });
+    }
+
+    function seatTypeMap(filterKey) {
+      return filterKey;
+    }
+
+    // --- MODAL CONTROLS ---
+    function openBookingModal(seatId) {
+      const seat = state.seats.find(s => s.id === seatId);
+      if (!seat) return;
+      state.selectedSeat = seat;
+
+      document.getElementById('modal-seat-title').innerText = `${seat.name} 예약`;
+      document.getElementById('modal-seat-badge').innerText = seat.type === 'general' ? '일반 열람석' : seat.type === 'laptop' ? '노트북존' : '그룹 스터디룸';
+      document.getElementById('modal-seat-zone').innerText = seat.zone;
+      document.getElementById('modal-seat-features').innerText = seat.features.join(', ');
+      document.getElementById('modal-reservation-date').innerText = state.selectedDate;
+
+      // Fill time options
+      const startSelect = document.getElementById('select-start-time');
+      const endSelect = document.getElementById('select-end-time');
+      
+      startSelect.innerHTML = TIME_SLOTS.slice(0, -1).map(t => `<option value="${t}">${t}</option>`).join('');
+      endSelect.innerHTML = TIME_SLOTS.slice(1).map(t => `<option value="${t}">${t}</option>`).join('');
+
+      // Default start 09:00, end 12:00
+      startSelect.value = '09:00';
+      endSelect.value = '12:00';
+
+      checkConflict();
+      document.getElementById('booking-modal').classList.remove('hidden');
+    }
+
+    function checkConflict() {
+      if (!state.selectedSeat) return false;
+      const start = document.getElementById('select-start-time').value;
+      const end = document.getElementById('select-end-time').value;
+      const warnBox = document.getElementById('time-conflict-warning');
+      const warnText = document.getElementById('time-conflict-text');
+      const submitBtn = document.getElementById('btn-submit-booking');
+
+      if (start >= end) {
+        warnBox.classList.remove('hidden');
+        warnText.innerText = '종료 시간은 시작 시간보다 뒤여야 합니다.';
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50');
+        return true;
+      }
+
+      const bookings = getSeatBookings(state.selectedSeat.id);
+      const isOverlap = bookings.some(b => (start < b.endTime && end > b.startTime));
+
+      if (isOverlap) {
+        warnBox.classList.remove('hidden');
+        warnText.innerText = '선택하신 시간대에 이미 다른 예약이 존재합니다. 다른 시간을 선택해 주세요.';
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50');
+        return true;
+      }
+
+      warnBox.classList.add('hidden');
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50');
+      return false;
+    }
+
+    // Phone auto hyphen
+    document.getElementById('input-user-phone').addEventListener('input', function(e) {
+      let val = e.target.value.replace(/[^0-9]/g, '');
+      if (val.length > 3 && val.length <= 7) {
+        val = val.slice(0, 3) + '-' + val.slice(3);
+      } else if (val.length > 7) {
+        val = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11);
+      }
+      e.target.value = val;
+    });
+
+    document.getElementById('select-start-time').addEventListener('change', checkConflict);
+    document.getElementById('select-end-time').addEventListener('change', checkConflict);
+
+    // Form Submit
+    document.getElementById('booking-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (checkConflict()) return;
+
+      const seat = state.selectedSeat;
+      const userName = document.getElementById('input-user-name').value.trim();
+      const userPhone = document.getElementById('input-user-phone').value.trim();
+      const startTime = document.getElementById('select-start-time').value;
+      const endTime = document.getElementById('select-end-time').value;
+
+      if (!userName || !userPhone) {
+        showToast('예약자 성함과 휴대폰 번호를 모두 입력해주세요.', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btn-submit-booking');
+      const spinner = document.getElementById('btn-submit-spinner');
+      const btnText = document.getElementById('btn-submit-text');
+
+      submitBtn.disabled = true;
+      spinner.classList.remove('hidden');
+      btnText.innerText = '예약 처리 중...';
+
+      const fallbackResId = `RES_${state.selectedDate.replace(/-/g, '')}_${seat.id}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const newReservation = {
+        id: fallbackResId,
+        seatId: seat.id,
+        seatName: seat.name,
+        userName,
+        userPhone,
+        date: state.selectedDate,
+        startTime,
+        endTime,
+        status: 'CONFIRMED'
+      };
+
+      // Always save to local storage
+      const localList = getStoredReservations();
+      localList.unshift(newReservation);
+      saveStoredReservations(localList);
+
+      // Attempt POST to GAS Web App
+      try {
+        const payload = {
+          action: 'createReservation',
+          data: {
+            seatId: seat.id,
+            userName,
+            userPhone,
+            date: state.selectedDate,
+            startTime,
+            endTime
+          }
+        };
+
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.reservationId) {
+            newReservation.id = json.reservationId;
+          }
+        }
+      } catch (err) {
+        console.warn('GAS POST fallback:', err);
+      }
+
+      // Finish & Show Success
+      submitBtn.disabled = false;
+      spinner.classList.add('hidden');
+      btnText.innerText = '예약 완료하기';
+
+      document.getElementById('booking-modal').classList.add('hidden');
+
+      // Refresh list
+      await fetchReservations(state.selectedDate);
+      renderGridView();
+      renderFloorMap();
+
+      // Show Success Modal
+      document.getElementById('success-res-id').innerText = newReservation.id;
+      document.getElementById('success-seat-name').innerText = `${seat.name} (${seat.zone})`;
+      document.getElementById('success-time').innerText = `${state.selectedDate} (${startTime} ~ ${endTime})`;
+      document.getElementById('success-user-name').innerText = userName;
+      document.getElementById('success-modal').classList.remove('hidden');
+
+      showToast('도서관 예약이 성공적으로 확정되었습니다.', 'success');
+    });
+
+    // Close Modals
+    document.getElementById('btn-close-booking-modal').addEventListener('click', () => {
+      document.getElementById('booking-modal').classList.add('hidden');
+    });
+    document.getElementById('btn-close-success').addEventListener('click', () => {
+      document.getElementById('success-modal').classList.add('hidden');
+    });
+    document.getElementById('btn-copy-res-id').addEventListener('click', () => {
+      const resId = document.getElementById('success-res-id').innerText;
+      navigator.clipboard.writeText(resId).then(() => {
+        showToast('예약 번호가 클립보드에 복사되었습니다.', 'success');
+      });
+    });
+
+    // --- MY BOOKINGS MODAL ---
+    document.getElementById('btn-open-my-bookings').addEventListener('click', () => {
+      document.getElementById('my-bookings-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-my-bookings').addEventListener('click', () => {
+      document.getElementById('my-bookings-modal').classList.add('hidden');
+    });
+
+    document.getElementById('btn-search-bookings').addEventListener('click', searchMyBookings);
+    document.getElementById('input-search-query').addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') searchMyBookings();
+    });
+
+    function searchMyBookings() {
+      const query = document.getElementById('input-search-query').value.trim().replace(/-/g, '').toLowerCase();
+      const container = document.getElementById('my-bookings-list');
+      if (!query) {
+        container.innerHTML = '<p class="text-xs text-red-500 text-center py-4">조회할 휴대폰 번호 또는 예약 번호를 입력해주세요.</p>';
+        return;
+      }
+
+      const all = getStoredReservations();
+      const matched = all.filter(r => {
+        const phone = (r.userPhone || '').replace(/-/g, '').toLowerCase();
+        const id = (r.id || '').toLowerCase();
+        return phone.includes(query) || id.includes(query);
+      });
+
+      if (matched.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-6">일치하는 예약 내역이 없습니다.</p>';
+        return;
+      }
+
+      container.innerHTML = matched.map(r => `
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-slate-900">${r.seatName || r.seatId}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${r.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}">
+              ${r.status === 'CANCELLED' ? '취소됨' : '예약 확정'}
+            </span>
+          </div>
+          <div class="text-[11px] text-slate-600 space-y-0.5">
+            <div>예약 번호: <span class="font-mono font-medium">${r.id}</span></div>
+            <div>일시: <span class="font-medium">${r.date} (${r.startTime} ~ ${r.endTime})</span></div>
+            <div>예약자: <span class="font-medium">${r.userName} (${r.userPhone})</span></div>
+          </div>
+          ${r.status !== 'CANCELLED' ? `
+            <div class="pt-2 flex justify-end">
+              <button class="btn-cancel-reservation text-xs px-3 py-1 bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 rounded-lg font-medium transition-colors" data-id="${r.id}">
+                예약 취소
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+
+      // Bind cancel buttons
+      container.querySelectorAll('.btn-cancel-reservation').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const resId = e.currentTarget.getAttribute('data-id');
+          if (!confirm(`예약번호 [${resId}]를 정말 취소하시겠습니까?`)) return;
+
+          // Local cancel
+          const list = getStoredReservations().map(item => item.id === resId ? { ...item, status: 'CANCELLED' } : item);
+          saveStoredReservations(list);
+
+          // GAS cancel
+          try {
+            await fetch(API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'cancelReservation', reservationId: resId })
+            });
+          } catch (err) {
+            console.warn(err);
+          }
+
+          showToast('예약이 정상적으로 취소되었습니다.', 'info');
+          searchMyBookings();
+          await fetchReservations(state.selectedDate);
+          renderGridView();
+          renderFloorMap();
+        });
+      });
+    }
+
+    // --- VIEW SWITCHING ---
+    document.getElementById('tab-grid').addEventListener('click', () => {
+      document.getElementById('tab-grid').className = "px-3.5 py-1.5 text-xs font-bold rounded-lg bg-white border border-slate-300 text-slate-900 shadow-sm flex items-center gap-1.5";
+      document.getElementById('tab-map').className = "px-3.5 py-1.5 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/60 flex items-center gap-1.5";
+      document.getElementById('view-grid').classList.remove('hidden');
+      document.getElementById('view-map').classList.add('hidden');
+      state.activeView = 'grid';
+    });
+
+    document.getElementById('tab-map').addEventListener('click', () => {
+      document.getElementById('tab-map').className = "px-3.5 py-1.5 text-xs font-bold rounded-lg bg-white border border-slate-300 text-slate-900 shadow-sm flex items-center gap-1.5";
+      document.getElementById('tab-grid').className = "px-3.5 py-1.5 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/60 flex items-center gap-1.5";
+      document.getElementById('view-map').classList.remove('hidden');
+      document.getElementById('view-grid').classList.add('hidden');
+      state.activeView = 'map';
+    });
+
+    // --- DATE PICKER & CHIPS ---
+    const dateInput = document.getElementById('reservation-date');
+    dateInput.value = state.selectedDate;
+    dateInput.min = getFormattedDate(0);
+
+    dateInput.addEventListener('change', async (e) => {
+      state.selectedDate = e.target.value;
+      // remove chip highlights
+      document.querySelectorAll('.date-chip').forEach(c => {
+        c.className = "date-chip px-3 py-1.5 text-xs font-medium rounded-lg transition-colors text-slate-600 hover:text-slate-900";
+      });
+      await fetchReservations(state.selectedDate);
+      renderGridView();
+      renderFloorMap();
+    });
+
+    document.querySelectorAll('.date-chip').forEach(chip => {
+      chip.addEventListener('click', async (e) => {
+        const offset = parseInt(e.currentTarget.getAttribute('data-offset'));
+        state.selectedDate = getFormattedDate(offset);
+        dateInput.value = state.selectedDate;
+
+        document.querySelectorAll('.date-chip').forEach(c => {
+          c.className = "date-chip px-3 py-1.5 text-xs font-medium rounded-lg transition-colors text-slate-600 hover:text-slate-900";
+        });
+        e.currentTarget.className = "date-chip px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-white text-slate-900 shadow-sm";
+
+        await fetchReservations(state.selectedDate);
+        renderGridView();
+        renderFloorMap();
+      });
+    });
+
+    // --- TYPE FILTERS ---
+    document.querySelectorAll('.type-filter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const type = e.currentTarget.getAttribute('data-type');
+        state.selectedType = type;
+
+        document.querySelectorAll('.type-filter-btn').forEach(b => {
+          b.className = "type-filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 whitespace-nowrap";
+        });
+        e.currentTarget.className = "type-filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white whitespace-nowrap";
+
+        renderGridView();
+      });
+    });
+
+    // --- GAS MODAL ---
+    document.getElementById('btn-gas-info').addEventListener('click', () => {
+      document.getElementById('gas-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-gas-modal').addEventListener('click', () => {
+      document.getElementById('gas-modal').classList.add('hidden');
+    });
+    document.getElementById('btn-save-gas-url').addEventListener('click', () => {
+      API_URL = document.getElementById('input-gas-api-url').value.trim();
+      showToast('API URL이 저장되었습니다. 데이터를 새로고침합니다.', 'success');
+      document.getElementById('gas-modal').classList.add('hidden');
+      fetchReservations(state.selectedDate).then(() => {
+        renderGridView();
+        renderFloorMap();
+      });
+    });
+
+    // --- INIT ---
+    async function init() {
+      updateCounts();
+      await fetchReservations(state.selectedDate);
+      renderGridView();
+      renderFloorMap();
+    }
+    init();
+  </script>
+</body>
+</html>
